@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Server Check</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+
+        h1 { color: #7ec8e3; margin-bottom: 4px; }
+        p.subtitle { color: #888; margin-top: 0; margin-bottom: 32px; }
+
+        .card {
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            border-radius: 6px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+        }
+
+        h2 { margin-top: 0; font-size: 1rem; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        button {
+            background: #7ec8e3;
+            color: #1a1a1a;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        button:hover { background: #a8ddef; }
+        button:active { background: #5bb5d4; }
+
+        input[type="password"] {
+            background: #1a1a1a;
+            border: 1px solid #555;
+            color: #e0e0e0;
+            padding: 7px 12px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            width: 220px;
+            margin-right: 8px;
+        }
+
+        pre {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 14px;
+            overflow-x: auto;
+            font-size: 0.8rem;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-top: 14px;
+            display: none;
+        }
+
+        .result-msg {
+            margin-top: 12px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            display: none;
+        }
+        .result-msg.ok  { background: #1e3a1e; border: 1px solid #4caf50; color: #a5d6a7; }
+        .result-msg.err { background: #3a1e1e; border: 1px solid #e57373; color: #ef9a9a; }
+    </style>
+</head>
+<body>
+
+    <h1>🎬 Dorfkino — Server Check</h1>
+    <p class="subtitle">A quick test to make sure everything is working before the real app arrives.</p>
+
+    <!-- ── ENV ── -->
+    <div class="card">
+        <h2>1 · Environment Variables</h2>
+        <p style="color:#aaa;font-size:0.85rem">Calls <code>GET /env</code> and dumps whatever <code>process.env</code> contains.</p>
+        <button onclick="checkEnv()">Show process.env</button>
+        <pre id="env-output"></pre>
+    </div>
+
+    <!-- ── PASSWORD ── -->
+    <div class="card">
+        <h2>2 · Password Check (bcrypt)</h2>
+        <p style="color:#aaa;font-size:0.85rem">
+            First click saves the password to <code>password.json</code> as a bcrypt hash.<br>
+            All subsequent clicks check against that saved hash.
+        </p>
+        <input type="password" id="pw-input" placeholder="Enter a password…" />
+        <button onclick="checkPassword()">Submit</button>
+        <div id="pw-result" class="result-msg"></div>
+    </div>
+
+    <script>
+        async function checkEnv() {
+            const pre = document.getElementById("env-output");
+            pre.style.display = "block";
+            pre.textContent = "Loading…";
+            try {
+                const res  = await fetch("/env");
+                const data = await res.json();
+                pre.textContent = JSON.stringify(data, null, 2);
+            } catch (e) {
+                pre.textContent = "Error: " + e.message;
+            }
+        }
+
+        async function checkPassword() {
+            const input  = document.getElementById("pw-input");
+            const result = document.getElementById("pw-result");
+            const password = input.value.trim();
+
+            if (!password) {
+                showResult(result, "Please enter a password first.", false);
+                return;
+            }
+
+            try {
+                const res  = await fetch("/password", {
+                    method:  "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body:    JSON.stringify({ password }),
+                });
+                const data = await res.json();
+
+                if (data.error) {
+                    showResult(result, "Error: " + data.error, false);
+                } else if (data.created) {
+                    showResult(result, "✓ " + data.message, true);
+                } else {
+                    showResult(result, (data.match ? "✓ " : "✗ ") + data.message, data.match);
+                }
+            } catch (e) {
+                showResult(result, "Network error: " + e.message, false);
+            }
+        }
+
+        function showResult(el, msg, ok) {
+            el.textContent  = msg;
+            el.className    = "result-msg " + (ok ? "ok" : "err");
+            el.style.display = "block";
+        }
+
+        // Allow Enter key in password field
+        document.getElementById("pw-input").addEventListener("keydown", e => {
+            if (e.key === "Enter") checkPassword();
+        });
+    </script>
+
+</body>
+</html>
